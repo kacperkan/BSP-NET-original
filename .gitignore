@@ -216,3 +216,7 @@ dmypy.json
 
 # End of https://www.gitignore.io/api/python,pycharm,jupyternotebooks
 .idea
+
+
+bsp_2d/checkpoint
+bsp_2d/samples
