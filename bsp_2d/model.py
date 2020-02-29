@@ -55,9 +55,6 @@ class IMSEG(object):
 				print(variable_parameters)
 			total_parameters += variable_parameters
 		print("Total number of parameters: {}".format(total_parameters))
-		import ipdb
-
-		ipdb.set_trace()
 
 	def build_model(self, phase):
 		#get coords
