@@ -32,7 +32,7 @@ class IMSEG(object):
 		self.dataset_name = dataset_name
 		self.checkpoint_dir = checkpoint_dir
 		self.data_dir = data_dir
-		
+
 		data_hdf5_name = self.data_dir+'/'+self.dataset_name+'.hdf5'
 		if os.path.exists(data_hdf5_name):
 			self.data_dict = h5py.File(data_hdf5_name, 'r')
@@ -40,8 +40,24 @@ class IMSEG(object):
 		else:
 			print("error: cannot load "+data_hdf5_name)
 			exit(0)
-		
+
 		self.build_model(phase)
+		total_parameters = 0
+		for variable in tf.trainable_variables():
+			# shape is an array of tf.Dimension
+			shape = variable.get_shape()
+			print(shape)
+			print(len(shape))
+			variable_parameters = 1
+			for dim in shape:
+				print(dim)
+				variable_parameters *= dim.value
+				print(variable_parameters)
+			total_parameters += variable_parameters
+		print("Total number of parameters: {}".format(total_parameters))
+		import ipdb
+
+		ipdb.set_trace()
 
 	def build_model(self, phase):
 		#get coords
@@ -82,46 +98,46 @@ class IMSEG(object):
 			self.loss_sp = tf.reduce_mean((1-self.point_value)*tf.abs(tf.minimum(self.G,1)-1) + self.point_value*tf.abs(tf.maximum(self.G,0)))
 			self.bmask = tf.cast(self.G2<0.01, tf.float32) * tf.cast( tf.reduce_sum(tf.cast(self.G2<0.01, tf.float32),axis=2, keepdims=True)>1, tf.float32)
 			self.loss = self.loss_sp - tf.reduce_mean(self.G2*self.point_value*self.bmask)
-			
+
 		self.saver = tf.train.Saver(max_to_keep=10)
-		
-		
+
+
 	def generator0(self, points, plane_m, plane_b, phase_train=True, reuse=False):
 		with tf.variable_scope("simple_net") as scope:
 			if reuse:
 				scope.reuse_variables()
-			
+
 			#level 1
 			h1 = tf.matmul(points, plane_m) + plane_b
 			h1 = tf.maximum(h1, 0)
-			
+
 			#level 2
 			convex_layer_weights = tf.get_variable("convex_layer_weights", [self.p_dim, self.gf_dim], initializer=tf.random_normal_initializer(stddev=0.02))
 			h2 = tf.matmul(h1, convex_layer_weights)
 			h2 = tf.maximum(tf.minimum(1-h2, 1), 0)
-			
+
 			#level 3
 			concave_layer_weights = tf.get_variable("concave_layer_weights", [self.gf_dim, 1], initializer=tf.random_normal_initializer(stddev=0.02))
 			h3 = tf.matmul(h2, concave_layer_weights)
 			h3 = tf.maximum(tf.minimum(h3, 1), 0)
 			h3_max = tf.reduce_max(h2, axis=2, keepdims=True)
-			
+
 		return h3, h3_max, h2, convex_layer_weights, concave_layer_weights
 
 	def generator1(self, points, plane_m, plane_b, phase_train=True, reuse=False):
 		with tf.variable_scope("simple_net") as scope:
 			if reuse:
 				scope.reuse_variables()
-			
+
 			#level 1
 			h1 = tf.matmul(points, plane_m) + plane_b
 			h1 = tf.maximum(h1, 0)
-			
+
 			#level 2
 			convex_layer_weights = tf.get_variable("convex_layer_weights", [self.p_dim, self.gf_dim], initializer=tf.random_normal_initializer(stddev=0.02))
 			convex_layer_weights = tf.cast(convex_layer_weights>0.01, convex_layer_weights.dtype)
 			h2 = tf.matmul(h1, convex_layer_weights)
-			
+
 			#level 3
 			h3 = tf.reduce_min(h2, axis=2, keepdims=True)
 			h3_01 = tf.maximum(tf.minimum(1-tf.stop_gradient(h3), 1), 0)
@@ -132,13 +148,13 @@ class IMSEG(object):
 		with tf.variable_scope("encoder") as scope:
 			if reuse:
 				scope.reuse_variables()
-			
+
 			d_1 = conv2d(inputs, shape=[4, 4, 1, self.ef_dim], strides=[1,2,2,1], scope='conv_1')
 			d_1 = lrelu(d_1)
 
 			d_2 = conv2d(d_1, shape=[4, 4, self.ef_dim, self.ef_dim*2], strides=[1,2,2,1], scope='conv_2')
 			d_2 = lrelu(d_2)
-			
+
 			d_3 = conv2d(d_2, shape=[4, 4, self.ef_dim*2, self.ef_dim*4], strides=[1,2,2,1], scope='conv_3')
 			d_3 = lrelu(d_3)
 
@@ -165,7 +181,7 @@ class IMSEG(object):
 			l4_b = tf.reshape(l4_b,[-1, 1, self.p_dim])
 
 			return l4_m, l4_b
-	
+
 	def train(self, config):
 		ae_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1).minimize(self.loss)
 		self.sess.run(tf.global_variables_initializer())
@@ -174,19 +190,19 @@ class IMSEG(object):
 			print(" [*] Load SUCCESS")
 		else:
 			print(" [!] Load failed...")
-			
+
 		shane_num = len(self.data_voxels)
 		batch_index_list = np.arange(shane_num)
-		
+
 		print("\n\n----------net summary----------")
 		print("training samples   ", shane_num)
 		print("-------------------------------\n\n")
-		
+
 		counter = 0
 		start_time = time.time()
 		assert config.epoch==0 or config.iteration==0
 		training_epoch = config.epoch + int(config.iteration/shane_num)
-		
+
 		batch_num = int(shane_num/self.shape_batch_size)
 		for epoch in range(0, training_epoch):
 			np.random.shuffle(batch_index_list)
@@ -205,7 +221,7 @@ class IMSEG(object):
 			print(str(self.sample_vox_size)+" Epoch: [%2d/%2d] time: %4.4f, loss_sp: %.8f, loss_total: %.8f" % (epoch, training_epoch, time.time() - start_time, avg_loss_sp/avg_num, avg_loss_tt/avg_num))
 			if epoch%100==99:
 				self.test_1(config)
-				
+
 		if config.phase==0:
 			self.save(config.checkpoint_dir, self.sample_vox_size)
 		else:
@@ -226,7 +242,7 @@ class IMSEG(object):
 		for t in range(self.shape_batch_size):
 			cv2.imwrite(config.sample_dir+"/"+str(t)+"_out.png", imgs[t])
 			cv2.imwrite(config.sample_dir+"/"+str(t)+"_gt.png", batch_voxels[t]*255)
-		
+
 		if config.phase==1 or config.phase==2:
 			image_out_size = 256
 			w2 = self.sess.run(self.cw2, feed_dict={})
@@ -260,7 +276,7 @@ class IMSEG(object):
 
 				#print(bsp_convex_list)
 				print(len(bsp_convex_list))
-				
+
 				#convert bspt to mesh
 				vertices = []
 				polygons = []
@@ -276,7 +292,7 @@ class IMSEG(object):
 						x2 = ((vg[tg[j][1]][1]+0.5)*image_out_size).astype(np.int32)
 						y2 = ((vg[tg[j][1]][0]+0.5)*image_out_size).astype(np.int32)
 						cv2.line(img_out, (x1,y1), (x2,y2), cg, thickness=1)
-				
+
 				cv2.imwrite(config.sample_dir+"/"+str(t)+"_bsp.png", img_out)
 
 		print("[sample]")
@@ -289,7 +305,7 @@ class IMSEG(object):
 		else:
 			print(" [!] Load failed...")
 			return
-		
+
 		image_out_size = 256
 		w2 = self.sess.run(self.cw2, feed_dict={})
 
@@ -322,7 +338,7 @@ class IMSEG(object):
 
 			#print(bsp_convex_list)
 			print(len(bsp_convex_list))
-			
+
 			#convert bspt to mesh
 			vertices = []
 			polygons = []
@@ -338,7 +354,7 @@ class IMSEG(object):
 					x2 = ((vg[tg[j][1]][1]+0.5)*image_out_size).astype(np.int32)
 					y2 = ((vg[tg[j][1]][0]+0.5)*image_out_size).astype(np.int32)
 					cv2.line(img_out, (x1,y1), (x2,y2), cg, thickness=1)
-			
+
 			cv2.imwrite(config.sample_dir+"/"+str(t)+"_bsp.png", img_out)
 
 	#output h3
@@ -360,12 +376,12 @@ class IMSEG(object):
 			cv2.imwrite(config.sample_dir+"/"+str(t)+"_out.png", imgs[t])
 			cv2.imwrite(config.sample_dir+"/"+str(t)+"_gt.png", batch_voxels[t]*255)
 		print("[sample]")
-	
+
 	@property
 	def model_dir(self):
 		return "{}_{}".format(
 				self.dataset_name, self.sample_vox_size)
-			
+
 	def save(self, checkpoint_dir, step):
 		model_name = "IMSEG.model"
 		checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
