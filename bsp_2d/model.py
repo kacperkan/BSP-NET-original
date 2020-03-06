@@ -1,5 +1,6 @@
 import os
 import time
+import tqdm
 
 import cv2
 import h5py
@@ -560,7 +561,7 @@ class IMSEG(object):
 
         total_mse = 0
         total_points = 0
-        for i in range(0, len(self.data_voxels), self.shape_batch_size):
+        for i in tqdm.trange(0, len(self.data_voxels), self.shape_batch_size):
             batch_voxels = self.data_voxels[i : i + self.shape_batch_size]
             model_out, out_m, out_b = self.sess.run(
                 [self.sG2, self.sE_m, self.sE_b],
