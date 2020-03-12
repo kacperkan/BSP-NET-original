@@ -569,23 +569,15 @@ class IMSEG(object):
             model_out = self.sess.run(
                 [outG], feed_dict={self.vox3d: batch_voxels}
             )
-            model_out = (
-                1
-                - np.clip(
-                    np.resize(
-                        model_out,
-                        [
-                            self.shape_batch_size,
-                            self.sample_vox_size,
-                            self.sample_vox_size,
-                        ],
-                    )
-                    * 256,
-                    0,
-                    255,
-                )
-                / 255
+            resized_out = np.resize(
+                model_out,
+                [
+                    self.shape_batch_size,
+                    self.sample_vox_size,
+                    self.sample_vox_size,
+                ],
             )
+            model_out = 1 - np.clip(resized_out * 256, 0, 255) / 255
             for img in model_out:
                 cv2.imwrite(
                     config.sample_dir
