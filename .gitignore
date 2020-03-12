@@ -220,3 +220,4 @@ dmypy.json
 
 bsp_2d/checkpoint
 bsp_2d/samples
+mse_predictions
