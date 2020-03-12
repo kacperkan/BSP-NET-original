@@ -565,22 +565,41 @@ class IMSEG(object):
         j = 0
         for i in tqdm.trange(0, len(self.data_voxels), self.shape_batch_size):
             batch_voxels = self.data_voxels[i : i + self.shape_batch_size]
-            model_out = self.sess.run([outG], feed_dict={self.vox3d: batch_voxels})
-            model_out = 1 - np.clip(
-                np.resize(
-                    model_out,
-                    [
-                        self.shape_batch_size,
-                        self.sample_vox_size,
-                        self.sample_vox_size,
-                    ],
-                ) * 256, 0, 255
-            ) / 255
+            model_out = self.sess.run(
+                [outG], feed_dict={self.vox3d: batch_voxels}
+            )
+            model_out = (
+                1
+                - np.clip(
+                    np.resize(
+                        model_out,
+                        [
+                            self.shape_batch_size,
+                            self.sample_vox_size,
+                            self.sample_vox_size,
+                        ],
+                    )
+                    * 256,
+                    0,
+                    255,
+                )
+                / 255
+            )
             for img in model_out:
-                cv2.imwrite(config.sample_dir + "/mse_predictions/" + str(j) + "_out.png", (img * 255).astype(np.uint8))
+                cv2.imwrite(
+                    config.sample_dir
+                    + "/mse_predictions/"
+                    + str(j)
+                    + "_out.png",
+                    (img * 255).astype(np.uint8),
+                )
                 j += 1
-                        
-            total_mses.append(np.mean(np.square(model_out - batch_voxels[..., 0]), axis=(1, 2)))
+
+            total_mses.append(
+                np.mean(
+                    np.square(model_out - batch_voxels[..., 0]), axis=(1, 2)
+                )
+            )
 
         print(f"MSE: {np.mean(total_mses):.4f}")
 
