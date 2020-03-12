@@ -561,8 +561,9 @@ class IMSEG(object):
             return
         os.makedirs(config.sample_dir + "/mse_predictions", exist_ok=True)
 
-        total_mses = []
         j = 0
+        predictions = []
+        truths = []
         for i in tqdm.trange(0, len(self.data_voxels), self.shape_batch_size):
             batch_voxels = self.data_voxels[i : i + self.shape_batch_size]
             model_out = self.sess.run(
@@ -595,13 +596,13 @@ class IMSEG(object):
                 )
                 j += 1
 
-            total_mses.append(
-                np.mean(
-                    np.square(model_out - batch_voxels[..., 0]), axis=(1, 2)
-                )
-            )
+            predictions.append(model_out)
+            truths.append(batch_voxels[..., 0])
 
-        print(f"MSE: {np.mean(total_mses):.4f}")
+        predictions = np.concatenate(predictions, axis=0)
+        truths = np.concatenate(truths)
+        mse = np.mean(np.square((predictions - truths)))
+        print(f"MSE: {mse:.4f}")
 
     # output h3
     def test_dae3(self, config):
