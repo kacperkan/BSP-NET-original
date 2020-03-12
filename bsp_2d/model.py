@@ -602,7 +602,7 @@ class IMSEG(object):
         predictions = np.concatenate(predictions, axis=0)
         truths = np.concatenate(truths)
         mse = np.mean(np.square((predictions - truths)))
-        print(f"MSE: {mse:.4f}")
+        print(f"MSE: {mse}")
 
     # output h3
     def test_dae3(self, config):
