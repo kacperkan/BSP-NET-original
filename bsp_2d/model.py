@@ -552,7 +552,7 @@ class IMSEG(object):
             cv2.imwrite(config.sample_dir + "/" + str(t) + "_bsp.png", img_out)
 
     def test_mse(self, config):
-        outG = self.sG
+        outG = self.sG_max
         could_load, checkpoint_counter = self.load(self.checkpoint_dir)
         if could_load:
             print(" [*] Load SUCCESS")
@@ -577,8 +577,7 @@ class IMSEG(object):
                     self.sample_vox_size,
                 ],
             )
-            model_out = 1 - np.clip(resized_out * 256, 0, 255) / 255
-            for img in model_out:
+            for img in resized_out:
                 cv2.imwrite(
                     config.sample_dir
                     + "/mse_predictions/"
@@ -588,7 +587,7 @@ class IMSEG(object):
                 )
                 j += 1
 
-            predictions.append(model_out)
+            predictions.append(resized_out)
             truths.append(batch_voxels[..., 0])
 
         predictions = np.concatenate(predictions, axis=0)
